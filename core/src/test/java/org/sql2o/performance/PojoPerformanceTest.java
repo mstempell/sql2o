@@ -32,6 +32,9 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.sql2o.Query;
 import org.sql2o.Sql2o;
 import org.sql2o.tools.FeatureDetector;
+import jodd.db.DbSession;
+import jodd.db.connection.DataSourceConnectionProvider;
+import jodd.db.oom.DbOomQuery;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Field;
@@ -144,6 +147,8 @@ public class PojoPerformanceTest
         tests.add(new ApacheDbUtilsTypicalSelect());
         tests.add(new MyBatisSelect());
         tests.add(new SpringJdbcTemplateSelect());
+        tests.add(new DbOomOptimalSelect());
+        tests.add(new DbOomTypicalSelect());
 
         System.out.println("Warming up...");
         tests.run(ITERATIONS);
@@ -549,5 +554,49 @@ public class PojoPerformanceTest
         @Override
         public void close()
         {}
+    }
+
+    abstract class DbOomSelect extends PerformanceTestBase
+    {
+        private DbSession session;
+        private DbOomQuery query;
+        
+        abstract String getSQL();
+
+        @Override
+        public void init()
+        {
+            session = new DbSession(new DataSourceConnectionProvider(sql2o.getDataSource()));
+            query = new DbOomQuery(session, getSQL() + " WHERE id = ?");
+        }
+
+        @Override
+        public void run(int input)
+        {
+            query.setInteger(1, input);
+            query.find(Post.class);
+        }
+
+        @Override
+        public void close()
+        {
+            session.closeSession();
+        }
+    }
+
+    class DbOomTypicalSelect extends DbOomSelect
+    {
+        @Override
+        String getSQL() {
+            return SELECT_TYPICAL;
+        }
+    }
+
+    class DbOomOptimalSelect extends DbOomSelect
+    {
+        @Override
+        String getSQL() {
+            return SELECT_OPTIMAL;
+        }
     }
 }
